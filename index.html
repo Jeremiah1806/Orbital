@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ORBITAL ARCHITECT — NASA JPL Mission Design Lab</title>
+  <!-- Google Fonts & Material Symbols Outlined (Zero Emojis) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,500,0,0" rel="stylesheet" />
+  <!-- Three.js r128 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- STAGE 1: MISSION BRIEFING & MODE SELECT OVERLAY -->
+  <div id="briefing-modal" class="modal-backdrop">
+    <div class="modal-card briefing-card">
+      <div class="briefing-header">
+        <div class="nasa-badge">
+          <span class="material-symbols-outlined">rocket_launch</span>
+          <span>NASA JPL • MISSION DESIGN LAB</span>
+        </div>
+        <button id="btn-audio-toggle-modal" class="icon-btn" title="Toggle Telemetry Audio">
+          <span class="material-symbols-outlined">volume_up</span>
+        </button>
+      </div>
+
+      <h1 class="briefing-title">ORBITAL ARCHITECT</h1>
+      <p class="briefing-subtitle">
+        System-level spacecraft engineering simulator. Balance launch mass, solar flux, eclipse survival, and DSN RF downlink budgets from concept to orbital operations.
+      </p>
+
+      <!-- Mode Selector -->
+      <div class="section-label">1. SELECT OPERATIONS MODE</div>
+      <div class="mode-grid" id="mode-selector">
+        <button class="mode-btn active" data-mode="solo">
+          <span class="material-symbols-outlined">person</span>
+          <div class="mode-text">
+            <strong>Solo Architect</strong>
+            <span>Command all 4 subsystems</span>
+          </div>
+        </button>
+        <button class="mode-btn" data-mode="team">
+          <span class="material-symbols-outlined">groups</span>
+          <div class="mode-text">
+            <strong>4-Player Team</strong>
+            <span>Role consoles &amp; config sync</span>
+          </div>
+        </button>
+        <button class="mode-btn" data-mode="sandbox">
+          <span class="material-symbols-outlined">all_inclusive</span>
+          <div class="mode-text">
+            <strong>Sandbox Lab</strong>
+            <span>Unlimited budget &amp; mass</span>
+          </div>
+        </button>
+        <button class="mode-btn" data-mode="custom">
+          <span class="material-symbols-outlined">tune</span>
+          <div class="mode-text">
+            <strong>Custom Architect</strong>
+            <span>Edit costs &amp; build custom parts</span>
+          </div>
+        </button>
+      </div>
+
+      <!-- Custom Mission Parameters (Visible when Custom Mode selected) -->
+      <div id="custom-mission-panel" class="custom-panel hidden">
+        <div class="section-label">CUSTOM MISSION PARAMETERS</div>
+        <div class="custom-inputs-grid">
+          <label>
+            <span>Mission Title</span>
+            <input type="text" id="cust-title" value="Custom Deep-Space Recon" />
+          </label>
+          <label>
+            <span>Budget Cap ($M)</span>
+            <input type="number" id="cust-budget" value="450" min="50" max="5000" />
+          </label>
+          <label>
+            <span>Science Target (PTS)</span>
+            <input type="number" id="cust-science" value="180" min="20" max="1000" />
+          </label>
+          <label>
+            <span>Solar Flux (%)</span>
+            <input type="number" id="cust-flux" value="45" min="1" max="200" />
+          </label>
+        </div>
+      </div>
+
+      <!-- Scenario Selector -->
+      <div class="section-label">2. SELECT CONTRACT SCENARIO</div>
+      <div class="scenario-grid" id="scenario-list"></div>
+
+      <div class="briefing-footer">
+        <label class="tour-check">
+          <input type="checkbox" id="chk-tour" checked />
+          <span>Launch with 3-Step Flight Director Quick-Start Tour</span>
+        </label>
+        <button id="btn-start-mission" class="primary-cta">
+          <span class="material-symbols-outlined">engineering</span>
+          <span>ENTER ASSEMBLY HANGAR</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN WORKSTATION SHELL -->
+  <div id="app-shell" class="app-shell">
+    <!-- Top Telemetry & Stage Header -->
+    <header class="top-bar">
+      <div class="brand-cluster">
+        <button id="btn-open-briefing" class="ghost-btn" title="Change Mission or Mode">
+          <span class="material-symbols-outlined">grid_view</span>
+          <span>MISSIONS</span>
+        </button>
+        <div class="mission-pill">
+          <span class="status-dot"></span>
+          <span id="hdr-mission-name">EARTH OCEAN SENTINEL</span>
+          <span id="hdr-mode-tag" class="mode-chip">SOLO</span>
+        </div>
+      </div>
+
+      <!-- 4-Step Hangar Navigation -->
+      <nav class="step-tabs" id="step-tabs">
+        <button class="step-tab active" data-step="0">
+          <span class="step-num">01</span>
+          <span class="material-symbols-outlined">rocket</span>
+          <span>Launch &amp; Orbit</span>
+        </button>
+        <button class="step-tab" data-step="1">
+          <span class="step-num">02</span>
+          <span class="material-symbols-outlined">biotech</span>
+          <span>Science Gear</span>
+        </button>
+        <button class="step-tab" data-step="2">
+          <span class="step-num">03</span>
+          <span class="material-symbols-outlined">bolt</span>
+          <span>Power &amp; Thermal</span>
+        </button>
+        <button class="step-tab" data-step="3">
+          <span class="step-num">04</span>
+          <span class="material-symbols-outlined">satellite_alt</span>
+          <span>Comms &amp; DSN</span>
+        </button>
+      </nav>
+
+      <!-- Utility Actions -->
+      <div class="utility-cluster">
+        <button id="btn-preset-baseline" class="ghost-btn" title="Auto-fill a working starter spacecraft for beginners">
+          <span class="material-symbols-outlined">auto_fix_high</span>
+          <span>Load Baseline</span>
+        </button>
+        <button id="btn-preset-clear" class="ghost-btn" title="Reset spacecraft components">
+          <span class="material-symbols-outlined">restart_alt</span>
+          <span>Clear</span>
+        </button>
+        <button id="btn-team-sync" class="ghost-btn hidden" title="Share 4-Player Team Config Code">
+          <span class="material-symbols-outlined">share</span>
+          <span>Team Sync</span>
+        </button>
+        <button id="btn-audio-toggle" class="icon-btn" title="Toggle Telemetry Audio">
+          <span class="material-symbols-outlined">volume_up</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Workspace Split -->
+    <main class="workspace-grid">
+      <!-- LEFT PANEL: Subsystem Configuration & Trade-Offs -->
+      <aside class="config-panel">
+        <div class="panel-header">
+          <div>
+            <h2 id="step-title">01. Launch Vehicle &amp; Target Orbit</h2>
+            <p id="step-desc" class="muted-text">Select your booster capacity and orbital altitude.</p>
+          </div>
+          <button id="btn-add-custom-part" class="accent-outline-btn hidden">
+            <span class="material-symbols-outlined">add_circle</span>
+            <span>CUSTOM PART</span>
+          </button>
+        </div>
+
+        <!-- Beginner "Why This Matters" Engineering Insight Box -->
+        <div class="insight-box" id="insight-box">
+          <span class="material-symbols-outlined">lightbulb</span>
+          <div id="insight-text">
+            <strong>Engineering Trade-Off:</strong> Bigger rockets lift heavier payloads to deep space, but consume budget needed for solar arrays and instruments.
+          </div>
+        </div>
+
+        <!-- Component Selection Cards -->
+        <div id="component-list" class="component-list"></div>
+
+        <!-- Live Budget & Mass Breakdown Stacked Bar -->
+        <div class="breakdown-card">
+          <div class="breakdown-header">
+            <span>SUBSYSTEM COST ALLOCATION</span>
+            <span id="breakdown-total-label">$0M / $300M</span>
+          </div>
+          <div class="stacked-bar" id="cost-stacked-bar">
+            <div class="seg seg-launch" style="width: 25%" title="Launch"></div>
+            <div class="seg seg-science" style="width: 15%" title="Science"></div>
+            <div class="seg seg-power" style="width: 15%" title="Power"></div>
+            <div class="seg seg-comms" style="width: 10%" title="Comms"></div>
+          </div>
+          <div class="legend-row">
+            <span><i class="dot seg-launch"></i>Launch</span>
+            <span><i class="dot seg-science"></i>Science</span>
+            <span><i class="dot seg-power"></i>Power</span>
+            <span><i class="dot seg-comms"></i>Comms</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- CENTER/RIGHT VIEWPORT: 3D Interactive Spacecraft & Orbital Canvas -->
+      <section class="viewport-section">
+        <!-- Top Floating HUD Controls -->
+        <div class="viewport-hud-top">
+          <div class="view-switcher">
+            <button id="btn-view-craft" class="view-btn active">
+              <span class="material-symbols-outlined">deployed_code</span>
+              <span>SPACECRAFT ASSEMBLY</span>
+            </button>
+            <button id="btn-view-orbit" class="view-btn">
+              <span class="material-symbols-outlined">public</span>
+              <span>ORBIT &amp; ECLIPSE VIEW</span>
+            </button>
+          </div>
+
+          <!-- Camera Presets (Visible in Orbit/Flight View) -->
+          <div id="camera-presets" class="camera-presets hidden">
+            <button class="cam-btn active" data-cam="overview">Overview</button>
+            <button class="cam-btn" data-cam="chase">Chase Craft</button>
+            <button class="cam-btn" data-cam="dsn">DSN Ground Lock</button>
+          </div>
+
+          <!-- Live Orbital Telemetry Box -->
+          <div class="telemetry-readout">
+            <div class="tele-row">
+              <span>TARGET BODY:</span>
+              <strong id="tele-body">EARTH (LEO)</strong>
+            </div>
+            <div class="tele-row">
+              <span>SOLAR FLUX:</span>
+              <strong id="tele-flux" class="text-amber">100% (1361 W/m²)</strong>
+            </div>
+            <div class="tele-row">
+              <span>ECLIPSE WINDOW:</span>
+              <strong id="tele-eclipse">35 min / orbit</strong>
+            </div>
+            <div class="tele-row">
+              <span>DSN TELEMETRY:</span>
+              <strong id="tele-dsn" class="text-green">DSN LOCKED</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3D WebGL Canvas + 2D Tactical Overlay -->
+        <div id="viewport-container" class="viewport-container">
+          <canvas id="three-canvas"></canvas>
+          <canvas id="fx-canvas" class="fx-overlay"></canvas>
+
+          <!-- 3D Over-Mass Cage Warning Banner -->
+          <div id="overmass-banner" class="overmass-banner hidden">
+            <span class="material-symbols-outlined">warning</span>
+            <span>STRUCTURAL ALERT: PAYLOAD EXCEEDS BOOSTER MASS LIMIT</span>
+          </div>
+
+          <!-- Launch Countdown Overlay -->
+          <div id="countdown-overlay" class="countdown-overlay hidden">
+            <div class="cd-tag">FLIGHT TERMINATION CHECK: NOMINAL</div>
+            <div id="cd-number" class="cd-number">T-3</div>
+            <div class="cd-telemetry">
+              <div><span>ALTITUDE</span><strong id="cd-alt">0.0 km</strong></div>
+              <div><span>VELOCITY</span><strong id="cd-vel">0.00 km/s</strong></div>
+              <div><span>MAX-Q</span><strong id="cd-q">NOMINAL</strong></div>
+            </div>
+          </div>
+
+          <!-- Active Flight HUD (During 3D Simulation) -->
+          <div id="flight-hud" class="flight-hud hidden">
+            <div class="flight-progress-card">
+              <div class="fp-top">
+                <span id="flight-phase-label">ORBITAL INSERTION &amp; SCIENCE OPS</span>
+                <strong id="flight-pct">0%</strong>
+              </div>
+              <div class="fp-bar"><div id="flight-bar-fill" class="fp-fill"></div></div>
+              <div class="fp-stats">
+                <span>SCIENCE: <strong id="fl-sci">0</strong></span>
+                <span>BATTERY: <strong id="fl-bat">100%</strong></span>
+                <span>DOWNLINK: <strong id="fl-data">0 Gb</strong></span>
+                <span id="fl-sun-state" class="sun-pill">SUNLIGHT</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2D Tactical Radar & Oscilloscope Corner Widget -->
+          <div class="tactical-corner">
+            <canvas id="scope-canvas" width="110" height="48"></canvas>
+            <canvas id="radar-canvas" width="64" height="64"></canvas>
+          </div>
+        </div>
+
+        <!-- Viewport Footer Hint -->
+        <div class="viewport-footer">
+          <span class="material-symbols-outlined">360</span>
+          <span>Drag to Orbit Camera • Scroll to Zoom • Click "Load Baseline" for a quick starter build</span>
+        </div>
+      </section>
+    </main>
+
+    <!-- BOTTOM PERSISTENT RESOURCE & LAUNCH READINESS BAR -->
+    <footer class="readiness-bar">
+      <div class="gauges-group">
+        <div class="gauge-item" id="g-budget">
+          <div class="g-head">
+            <span class="material-symbols-outlined">payments</span>
+            <span>BUDGET</span>
+            <strong id="val-budget">$0 / $300M</strong>
+          </div>
+          <div class="g-track"><div id="bar-budget" class="g-fill"></div></div>
+        </div>
+
+        <div class="gauge-item" id="g-mass">
+          <div class="g-head">
+            <span class="material-symbols-outlined">scale</span>
+            <span>MASS LIMIT</span>
+            <strong id="val-mass">0 / 1500 kg</strong>
+          </div>
+          <div class="g-track"><div id="bar-mass" class="g-fill"></div></div>
+        </div>
+
+        <div class="gauge-item" id="g-power">
+          <div class="g-head">
+            <span class="material-symbols-outlined">bolt</span>
+            <span>NET POWER</span>
+            <strong id="val-power">+0 W</strong>
+          </div>
+          <div class="g-track"><div id="bar-power" class="g-fill"></div></div>
+        </div>
+
+        <div class="gauge-item" id="g-science">
+          <div class="g-head">
+            <span class="material-symbols-outlined">science</span>
+            <span>SCIENCE GOAL</span>
+            <strong id="val-science">0 / 120 PTS</strong>
+          </div>
+          <div class="g-track"><div id="bar-science" class="g-fill"></div></div>
+        </div>
+      </div>
+
+      <!-- Plain-English Launch Blocker & CTA -->
+      <div class="launch-cluster">
+        <button id="btn-smart-hint" class="blocker-pill ready">
+          <span class="material-symbols-outlined" id="blocker-icon">check_circle</span>
+          <span id="blocker-text">ALL SYSTEMS NOMINAL — READY FOR LAUNCH</span>
+        </button>
+        <button id="btn-launch" class="launch-cta">
+          <span class="material-symbols-outlined">rocket_launch</span>
+          <span>EXECUTE LAUNCH</span>
+        </button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- QUICK-START 3-STEP TOUR POPOVER -->
+  <div id="tour-modal" class="modal-backdrop hidden">
+    <div class="modal-card tour-card">
+      <div class="nasa-badge">
+        <span class="material-symbols-outlined">school</span>
+        <span id="tour-step-badge">FLIGHT DIRECTOR BRIEFING • 1 OF 3</span>
+      </div>
+      <h3 id="tour-title">Every Part Triggers a Real Trade-Off</h3>
+      <p id="tour-body">
+        Adding high-resolution cameras boosts Science Points, but increases spacecraft Mass and Power draw. Watch the 4 gauges along the bottom bar—if any turn red, your mission cannot launch.
+      </p>
+      <div class="tour-actions">
+        <button id="btn-tour-skip" class="ghost-btn">Skip Tutorial</button>
+        <button id="btn-tour-next" class="primary-cta">
+          <span id="tour-next-label">Next Tip</span>
+          <span class="material-symbols-outlined">arrow_forward</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MID-FLIGHT INTERACTIVE CRISIS MODAL -->
+  <div id="crisis-modal" class="modal-backdrop hidden">
+    <div class="modal-card crisis-card">
+      <div class="crisis-alert-header">
+        <span class="material-symbols-outlined">warning</span>
+        <span>IN-FLIGHT ANOMALY DETECTED</span>
+      </div>
+      <h3 id="crisis-title">Coronal Mass Ejection (Solar Storm)</h3>
+      <p id="crisis-desc">
+        High-energy solar protons are impacting your spacecraft! Unshielded electronics risk permanent battery degradation unless you enter Safe Mode.
+      </p>
+      <div class="crisis-choices" id="crisis-choices"></div>
+    </div>
+  </div>
+
+  <!-- CUSTOM PART CREATOR MODAL -->
+  <div id="custom-part-modal" class="modal-backdrop hidden">
+    <div class="modal-card custom-modal-card">
+      <div class="panel-header">
+        <h3>Create Custom Subsystem Component</h3>
+        <button id="btn-close-custom-part" class="icon-btn">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+      <div class="custom-form">
+        <label>
+          <span>Component Name</span>
+          <input type="text" id="cp-name" placeholder="e.g., Next-Gen Quantum Spectrometer" />
+        </label>
+        <div class="custom-inputs-grid">
+          <label>
+            <span>Cost ($M)</span>
+            <input type="number" id="cp-cost" value="45" min="1" max="2000" />
+          </label>
+          <label>
+            <span>Mass (kg)</span>
+            <input type="number" id="cp-mass" value="120" min="1" max="10000" />
+          </label>
+          <label id="cp-metric1-label">
+            <span>Power Draw / Gen (W)</span>
+            <input type="number" id="cp-power" value="80" min="-2000" max="5000" />
+          </label>
+          <label id="cp-metric2-label">
+            <span>Science / Capacity Value</span>
+            <input type="number" id="cp-value" value="75" min="1" max="20000" />
+          </label>
+        </div>
+        <label>
+          <span>Engineering Description</span>
+          <input type="text" id="cp-desc" placeholder="Custom subsystem specification..." />
+        </label>
+        <button id="btn-save-custom-part" class="primary-cta full-w">
+          <span class="material-symbols-outlined">add_task</span>
+          <span>ADD COMPONENT TO HANGAR</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TEAM SYNC MODAL -->
+  <div id="sync-modal" class="modal-backdrop hidden">
+    <div class="modal-card custom-modal-card">
+      <div class="panel-header">
+        <h3>4-Player MDL Console Sync</h3>
+        <button id="btn-close-sync" class="icon-btn">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+      <p class="muted-text">Share this mission telemetry token with teammates to synchronize spacecraft builds across consoles:</p>
+      <textarea id="sync-code-box" rows="3" class="sync-textarea"></textarea>
+      <div class="tour-actions">
+        <button id="btn-copy-sync" class="ghost-btn">Copy Token</button>
+        <button id="btn-load-sync" class="primary-cta">Load Token</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STAGE 4: POST-MISSION ENGINEERING REPORT CARD -->
+  <div id="report-modal" class="modal-backdrop hidden">
+    <div class="modal-card report-card">
+      <div class="report-top">
+        <div>
+          <div class="nasa-badge">
+            <span class="material-symbols-outlined">assignment_turned_in</span>
+            <span>POST-FLIGHT ENGINEERING AUDIT</span>
+          </div>
+          <h2 id="rep-title">MISSION ACCOMPLISHED</h2>
+          <p id="rep-subtitle" class="muted-text">All scientific objectives met within JPL orbital tolerances.</p>
+        </div>
+        <div class="rank-stamp" id="rep-rank">S</div>
+      </div>
+
+      <div class="report-kpis">
+        <div class="kpi-box">
+          <span>FINAL SCORE</span>
+          <strong id="rep-score">0</strong>
+        </div>
+        <div class="kpi-box">
+          <span>SCIENCE RETURNED</span>
+          <strong id="rep-sci">0 PTS</strong>
+        </div>
+        <div class="kpi-box">
+          <span>BUDGET EFFICIENCY</span>
+          <strong id="rep-budget">100%</strong>
+        </div>
+        <div class="kpi-box">
+          <span>BATTERY RESERVE</span>
+          <strong id="rep-bat">82%</strong>
+        </div>
+      </div>
+
+      <div class="section-label">ENGINEERING ROOT-CAUSE &amp; FLIGHT LOG</div>
+      <ul id="rep-findings" class="findings-list"></ul>
+
+      <div class="nasa-twin-box">
+        <span class="material-symbols-outlined">history_edu</span>
+        <div>
+          <strong>REAL NASA FLIGHT HERITAGE COMPARISON</strong>
+          <p id="rep-twin">Your spacecraft closely mirrors NASA's Lunar Reconnaissance Orbiter (LRO).</p>
+        </div>
+      </div>
+
+      <div class="tour-actions">
+        <button id="btn-edit-design" class="ghost-btn">
+          <span class="material-symbols-outlined">tune</span>
+          <span>Modify Design &amp; Re-Fly</span>
+        </button>
+        <button id="btn-new-mission" class="primary-cta">
+          <span class="material-symbols-outlined">public</span>
+          <span>Select New Mission</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="physics.js"></script>
+  <script src="scene3d.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
